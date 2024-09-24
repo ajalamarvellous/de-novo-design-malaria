@@ -38,6 +38,28 @@ def describe_data(df: pd.DataFrame) -> None:
     print(f"The major types of activities in the data: {df.STANDARD_TYPE.unique()}")
 
 
+def subselect_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Subselect a portion of the dataset relevant for the dataset, 
+    specifically, we want to subselect the dataset for potency
+    
+    Argument(s)
+    -------------
+    df: pd.DataFrame
+        original complete dataset
+
+    Return(s)
+    ------------
+    new_df: pd.DataFrame
+        new subselected dataset
+    """
+    # subselect only potency and IC50 standard test type
+    df = df[(df["STANDARD_TYPE"] == "Potency") | (df["STANDARD_TYPE"] == "IC50")]
+    # subselect only dataset with activity comment
+    df = df[df.ACTIVITY_COMMENT.notnull()]
+    return df
+
+
 if __name__ == "__main__":
     df = read_file("data/MalariaData_bioactivity.txt")
     describe_data(df)
