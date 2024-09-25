@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import List
 
 import pandas as pd
 import numpy as np
@@ -73,6 +74,26 @@ def lowercase_column(df: pd.DataFrame, column: str="ACTIVITY_COMMENT") -> pd.Dat
     """
     df[column] = df[column].apply(lambda x: x.lower())
     return df
+
+def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
+    """
+    Group the dataframe by a key (smiles) and returns specified columns
+
+    Argument(s)
+    -------------
+    df: pd.DataFrame
+        dataframe to make edit on
+    key: str
+        column that is to serve as the key/primary identification
+    column: List[str]
+        List of the other columns to return
+
+    Return(s)
+    -----------
+    new_df: pd.DataFrame
+        new dataset that has been subselected
+    """
+    return pd.DataFrame(df.groupby(key)[columns])
 
 
 if __name__ == "__main__":
