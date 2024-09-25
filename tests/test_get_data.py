@@ -6,10 +6,11 @@ import pytest
 import pandas as pd
 
 sys.path.insert(1, "/Users/madeofajala/Projects/Malaria/src/")
-from get_data import (read_file, 
-                      describe_data,
-                      subselect_data, 
-                      lowercase_column)
+from get_data import (describe_data,
+                      group_by, 
+                      lowercase_column,
+                      read_file, 
+                      subselect_data,)
 
 FILE_ADDRESS = "data/MalariaData_bioactivity.txt"
 
@@ -44,3 +45,11 @@ def test_lowercase_column(df):
     assert new_df[column].apply(
       lambda x: x.islower()
     ).sum() == new_df.shape[0], "Not all values in lowercase"
+
+
+def test_group_by(df):
+    key = "CANONICAL_SMILES"
+    COLUMNS = ["STANDARD_VALUE", "ACTIVITY_COMMENT"]
+    new_df = group_by(df, key, COLUMNS)
+    assert new_df.iloc[0, :].duplicated().sum() == 0, "Some duplicate key values exist"
+    assert list(new_df.iloc[0, 1].columns) ==  COLUMNS
