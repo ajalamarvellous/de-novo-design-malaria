@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+import pytest
 
 import pandas as pd
 
@@ -9,20 +10,24 @@ from get_data import (read_file,
                       describe_data,
                         subselect_data, )
 
+FILE_ADDRESS = "data/MalariaData_bioactivity.txt"
 
-def test_read_file():
-    file_address = "data/MalariaData_bioactivity.txt"
-    df = read_file(file_address)
+@pytest.fixture()
+def df(FILE_ADDRESS=FILE_ADDRESS):
+    """
+    Returns a pandas dataframe of the data
+    """
+    return pd.read_table(FILE_ADDRESS, low_memory=False)
+
+
+def test_read_file(FILE_ADDRESS=FILE_ADDRESS):
+    df = read_file(FILE_ADDRESS)
     assert type(df) == pd.DataFrame, "Returned object not pandas DataFrame"
 
-def test_describe_data():
-    file_address = "data/MalariaData_bioactivity.txt"
-    df = read_file(file_address)
+def test_describe_data(df):
     describe_data(df)
 
-def test_subselect_data():
-    file_address = "data/MalariaData_bioactivity.txt"
-    df = read_file(file_address)
+def test_subselect_data(df):
     new_df = subselect_data(df)
     assert len(new_df) < len(df), "New dataset size not smaller than original dataset size"
     assert new_df.STANDARD_TYPE.nunique() == 2, f"Standard_type does not contain \
