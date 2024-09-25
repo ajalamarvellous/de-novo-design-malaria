@@ -96,6 +96,37 @@ def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
     return pd.DataFrame(df.groupby(key)[columns])
 
 
+def create_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Given the dataset grouped by the SMILES with the standard value and activity comment, return a 
+    dataframe returning with the smile and true if any standard value returns positive.
+    NB: This is based on the subselected potency and IC50 dataset
+
+    Argument(s)
+    ------------
+    df: pd.DataFrame
+        dataframe created based on groupby smiles containing just standard_value and activity comment
+
+    Return(s)
+    ----------
+    new_df: pd.DataFrame
+        new dataframe returning smiles and true is any standard experiment showed it's active
+    """
+
+    def get_activity(df: pd.DataFrame) -> bool:
+        for i in list(df["ACTIVITY_COMMENT"]):
+            if i == "active" :
+                return True
+        return False
+    new_ds = []
+    for i in range(len(df)):
+        row = df.iloc[i]
+        smiles = row[0]
+        activity = get_activity(row[1])
+        new_ds.append([smiles, activity])
+    return pd.DataFrame(new_ds, columns=["SMILES", "ACTIVITY"])
+
+
 if __name__ == "__main__":
     df = read_file("data/MalariaData_bioactivity.txt")
     describe_data(df)
