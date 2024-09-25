@@ -8,7 +8,8 @@ import pandas as pd
 sys.path.insert(1, "/Users/madeofajala/Projects/Malaria/src/")
 from get_data import (read_file, 
                       describe_data,
-                        subselect_data, )
+                      subselect_data, 
+                      lowercase_column)
 
 FILE_ADDRESS = "data/MalariaData_bioactivity.txt"
 
@@ -36,3 +37,10 @@ def test_subselect_data(df):
         ["Potency", "IC50"])) == [], f"presence of other stardard types, all \
             available types: {new_df.STANDARD_TYPE.unique()}"
     assert new_df.ACTIVITY_COMMENT.isna().sum() == 0, "Presence of null values in the activity_comment"
+
+def test_lowercase_column(df):
+    column = "ACTIVITY_COMMENT"
+    new_df = lowercase_column(subselect_data(df), column)
+    assert new_df[column].apply(
+      lambda x: x.islower()
+    ).sum() == new_df.shape[0], "Not all values in lowercase"
