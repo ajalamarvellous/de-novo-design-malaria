@@ -1,29 +1,27 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, TypeVar
 
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt 
-import seaborn as sns
-from rdkit.Chem import PandasTools
+
+addressType = TypeVar("addressType", str, Path)
 
 
-def read_file(file_address: str) -> pd.DataFrame:
+def read_file(file_address: addressType) -> pd.DataFrame:
     """
     Read the data file in pandas and return a pandas dataframe
 
     Argument(s)
     ------------
-    file_address: str
+    file_address: str \n
         address of the file to be opened
 
     Return(s)
     -----------
-    file_dataframe: pd.DataFrame
+    file_dataframe: pd.DataFrame \n
         pandas dataframe of the opened file
     """
-    return pd.read_table(file_address)
+    return pd.read_table(file_address, low_memory=False)
 
 
 def describe_data(df: pd.DataFrame) -> None:
@@ -46,12 +44,12 @@ def subselect_data(df: pd.DataFrame) -> pd.DataFrame:
     
     Argument(s)
     -------------
-    df: pd.DataFrame
+    df: pd.DataFrame \n
         original complete dataset
 
     Return(s)
     ------------
-    new_df: pd.DataFrame
+    new_df: pd.DataFrame \n
         new subselected dataset
     """
     # subselect only potency and IC50 standard test type
@@ -68,12 +66,19 @@ def lowercase_column(df: pd.DataFrame, column: str="ACTIVITY_COMMENT") -> pd.Dat
     
     Argument(s)
     -------------
-    df: pd.DataFrame
+    df: pd.DataFrame \n
         the dataset
-    column: column we want to select
+    column: str \n 
+        column we want to select
+
+    Return(s)
+    -----------
+    new_df: pd.DataFrame \n
+        new dataset with selected item all in lowercase
     """
     df[column] = df[column].apply(lambda x: x.lower())
     return df
+
 
 def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
     """
@@ -81,11 +86,11 @@ def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
 
     Argument(s)
     -------------
-    df: pd.DataFrame
+    df: pd.DataFrame \n
         dataframe to make edit on
-    key: str
+    key: str \n
         column that is to serve as the key/primary identification
-    column: List[str]
+    column: List[str] \n
         List of the other columns to return
 
     Return(s)
@@ -99,17 +104,17 @@ def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
 def create_dataset(df: pd.DataFrame) -> pd.DataFrame:
     """
     Given the dataset grouped by the SMILES with the standard value and activity comment, return a 
-    dataframe returning with the smile and true if any standard value returns positive.
+    dataframe returning with the smile and true if any standard value returns positive. \n
     NB: This is based on the subselected potency and IC50 dataset
 
     Argument(s)
     ------------
-    df: pd.DataFrame
+    df: pd.DataFrame \n
         dataframe created based on groupby smiles containing just standard_value and activity comment
 
     Return(s)
     ----------
-    new_df: pd.DataFrame
+    new_df: pd.DataFrame \n
         new dataframe returning smiles and true is any standard experiment showed it's active
     """
 
@@ -127,6 +132,31 @@ def create_dataset(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(new_ds, columns=["SMILES", "ACTIVITY"])
 
 
-if __name__ == "__main__":
-    df = read_file("data/MalariaData_bioactivity.txt")
+def main(
+        FILE_ADDRESS: addressType, 
+        key: str, 
+        COLUMNS: List, 
+         VIRTUAL_SCREENING_DS: addressType, 
+         DENOVO_DS: addressType
+    ) -> None:
+    df = read_file(FILE_ADDRESS)
     describe_data(df)
+    df = subselect_data(df)
+    df = lowercase_column(df)
+    df = group_by(df, key=key, columns=COLUMNS)
+    final_df = create_dataset(df)
+    # save the final dataset to be used for virtual screening
+    final_df.to_csv(VIRTUAL_SCREENING_DS, index=False)
+    # query for just the positive molecules and save just their smiles for denovo design
+    final_df.query("ACTIVITY == True")["SMILES"].to_csv(DENOVO_DS, index=False)
+
+
+if __name__ == "__main__":
+    FILE_ADDRESS = Path("data/MalariaData_bioactivity.txt")
+    VIRTUAL_SCREENING_DS = Path("data/Virtual-Screening.csv")
+    DENOVO_DS = Path("data/de-novo.csv")
+
+    key = "CANONICAL_SMILES"
+    COLUMNS = ["STANDARD_VALUE", "ACTIVITY_COMMENT"]
+    
+    main(FILE_ADDRESS, key, COLUMNS, VIRTUAL_SCREENING_DS, DENOVO_DS)
