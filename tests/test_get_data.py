@@ -6,7 +6,8 @@ import pytest
 import pandas as pd
 
 sys.path.insert(1, "/Users/madeofajala/Projects/Malaria/src/")
-from get_data import (describe_data,
+from get_data import (create_dataset,
+                      describe_data,
                       group_by, 
                       lowercase_column,
                       read_file, 
@@ -53,3 +54,15 @@ def test_group_by(df):
     new_df = group_by(df, key, COLUMNS)
     assert new_df.iloc[0, :].duplicated().sum() == 0, "Some duplicate key values exist"
     assert list(new_df.iloc[0, 1].columns) ==  COLUMNS
+
+
+def test_create_dataset(df):
+    df = group_by(
+        lowercase_column(subselect_data(df)), 
+        "CANONICAL_SMILES",
+        ["STANDARD_VALUE", "ACTIVITY_COMMENT"])
+    new_df = create_dataset(df)
+    assert new_df["SMILES"].duplicated().sum() == 0, "Error in analysis"
+    assert new_df.ACTIVITY.apply(lambda x: type(x) != bool).sum() == 0, "Activity \
+        value not all booleans"
+    assert len(df) == len(new_df), f"Some data missing: {len(df)-len(new_df)}"
