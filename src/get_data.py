@@ -60,6 +60,21 @@ def subselect_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def lowercase_column(df: pd.DataFrame, column: str="ACTIVITY_COMMENT") -> pd.DataFrame:
+    """
+    This fn helps to normalise a column, specifically the activity column to
+    ensure that all values are in lowercase
+    
+    Argument(s)
+    -------------
+    df: pd.DataFrame
+        the dataset
+    column: column we want to select
+    """
+    df[column] = df[column].apply(lambda x: x.lower())
+    return df
+
+
 if __name__ == "__main__":
     df = read_file("data/MalariaData_bioactivity.txt")
     describe_data(df)
