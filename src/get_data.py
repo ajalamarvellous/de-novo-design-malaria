@@ -1,9 +1,11 @@
 import os
+import yaml
 import logging
 from pathlib import Path
 from typing import List, TypeVar
 
 import pandas as pd
+import argparse
 
 # defining new variable for our artifact locations
 addressType = TypeVar("addressType", str, Path)
@@ -168,12 +170,21 @@ def main(
 
 
 if __name__ == "__main__":
-    FILE_ADDRESS = Path("data/MalariaData_bioactivity.txt")
-    VIRTUAL_SCREENING_DS = Path("data/Virtual-Screening.csv")
-    DENOVO_DS = Path("data/de-novo.csv")
-
-    key = "CANONICAL_SMILES"
-    COLUMNS = ["STANDARD_VALUE", "ACTIVITY_COMMENT"]
+    # setting up cli arguments
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config_file", type=str, default=None, help="Config \
+                        file containing information needed for creating new dataset"
+                        )
+    args = parser.parse_args()
+    
+    # loading the configs
+    with open(args.config_file, "r") as f:
+        config = yaml.load(f, Loader=yaml.BaseLoader)
+    FILE_ADDRESS = config["FILE_ADDRESS"]
+    VIRTUAL_SCREENING_DS = config["VIRTUAL_SCREENING_DS"]
+    DENOVO_DS = config["DENOVO_DS"]
+    key = config["groupby_key"]
+    COLUMNS = config["final_COLUMNS"]
     
     logger.info("Task starting...")
     main(FILE_ADDRESS, key, COLUMNS, VIRTUAL_SCREENING_DS, DENOVO_DS)
