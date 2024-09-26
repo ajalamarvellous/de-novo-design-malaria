@@ -1,0 +1,6 @@
+FILE_ADDRESS: "data/MalariaData_bioactivity.txt"
+VIRTUAL_SCREENING_DS: "data/Virtual-Screening.csv"
+DENOVO_DS: "data/de-novo.csv"
+
+groupby_key: "CANONICAL_SMILES"
+final_COLUMNS: ["STANDARD_VALUE", "ACTIVITY_COMMENT"]
