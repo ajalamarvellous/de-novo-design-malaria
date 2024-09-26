@@ -1,11 +1,18 @@
 import os
+import logging
 from pathlib import Path
 from typing import List, TypeVar
 
 import pandas as pd
 
+# defining new variable for our artifact locations
 addressType = TypeVar("addressType", str, Path)
-
+# basic logging config
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(funcName)s[%(levelname)s]: %(message)s ",
+)
+logger = logging.getLogger()
 
 def read_file(file_address: addressType) -> pd.DataFrame:
     """
@@ -21,20 +28,22 @@ def read_file(file_address: addressType) -> pd.DataFrame:
     file_dataframe: pd.DataFrame \n
         pandas dataframe of the opened file
     """
-    return pd.read_table(file_address, low_memory=False)
+    df = pd.read_table(file_address, low_memory=False)
+    logger.info("File read successfully...")
+    return df
 
 
 def describe_data(df: pd.DataFrame) -> None:
     """
     Basic description of the dataset
     """
-    print(f"No of columns: {df.shape[1]} and rows: {df.shape[0]}")
-    print(f"The Columns of the data \n {list(df.columns)}")
-    print(f"The top 5 rows of the data \n {df.head().T}")
-    print(f"The number of duplicate values: {df.duplicated().sum()}")
-    print(f"The number of unique smile values: {df.CANONICAL_SMILES.nunique()}")
-    print(f"The number of rows with no target values: {df.STANDARD_VALUE.isna().sum()}")
-    print(f"The major types of activities in the data: {df.STANDARD_TYPE.unique()}")
+    logger.debug(f"No of columns: {df.shape[1]} and rows: {df.shape[0]}")
+    logger.debug(f"The Columns of the data \n {list(df.columns)}")
+    logger.debug(f"The top 5 rows of the data \n {df.head().T}")
+    logger.debug(f"The number of duplicate values: {df.duplicated().sum()}")
+    logger.debug(f"The number of unique smile values: {df.CANONICAL_SMILES.nunique()}")
+    logger.debug(f"The number of rows with no target values: {df.STANDARD_VALUE.isna().sum()}")
+    logger.debug(f"The major types of activities in the data: {df.STANDARD_TYPE.unique()}")
 
 
 def subselect_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -56,6 +65,7 @@ def subselect_data(df: pd.DataFrame) -> pd.DataFrame:
     df = df[(df["STANDARD_TYPE"] == "Potency") | (df["STANDARD_TYPE"] == "IC50")]
     # subselect only dataset with activity comment
     df = df[df.ACTIVITY_COMMENT.notnull()]
+    logger.info("Subset of the data successfully selected...")
     return df
 
 
@@ -77,6 +87,7 @@ def lowercase_column(df: pd.DataFrame, column: str="ACTIVITY_COMMENT") -> pd.Dat
         new dataset with selected item all in lowercase
     """
     df[column] = df[column].apply(lambda x: x.lower())
+    logger.info(f"All items of column {column} converted to lowercase...")
     return df
 
 
@@ -98,7 +109,9 @@ def group_by(df: pd.DataFrame, key: str, columns=List[str]) -> pd.DataFrame:
     new_df: pd.DataFrame
         new dataset that has been subselected
     """
-    return pd.DataFrame(df.groupby(key)[columns])
+    df = pd.DataFrame(df.groupby(key)[columns])
+    logger.info(f"Data sucessfully grouped by {key}...")
+    return df
 
 
 def create_dataset(df: pd.DataFrame) -> pd.DataFrame:
@@ -129,7 +142,9 @@ def create_dataset(df: pd.DataFrame) -> pd.DataFrame:
         smiles = row[0]
         activity = get_activity(row[1])
         new_ds.append([smiles, activity])
-    return pd.DataFrame(new_ds, columns=["SMILES", "ACTIVITY"])
+    df = pd.DataFrame(new_ds, columns=["SMILES", "ACTIVITY"])
+    logger.info("Final dataset created")
+    return df
 
 
 def main(
@@ -149,6 +164,7 @@ def main(
     final_df.to_csv(VIRTUAL_SCREENING_DS, index=False)
     # query for just the positive molecules and save just their smiles for denovo design
     final_df.query("ACTIVITY == True")["SMILES"].to_csv(DENOVO_DS, index=False)
+    logger.info(f"Files saved to {VIRTUAL_SCREENING_DS} and {DENOVO_DS}")
 
 
 if __name__ == "__main__":
@@ -159,4 +175,6 @@ if __name__ == "__main__":
     key = "CANONICAL_SMILES"
     COLUMNS = ["STANDARD_VALUE", "ACTIVITY_COMMENT"]
     
+    logger.info("Task starting...")
     main(FILE_ADDRESS, key, COLUMNS, VIRTUAL_SCREENING_DS, DENOVO_DS)
+    logger.info("Task completed...")
