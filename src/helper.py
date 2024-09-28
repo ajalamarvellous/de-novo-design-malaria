@@ -38,13 +38,13 @@ def split_dataset(df: pd.DataFrame,
         the splitted dataset in the order (train, test)
     """
 
-    smiles = df["SMILES"].to_dict
-    train_test_partition = lohi.hi_train_test_splitter(
+    smiles = df["SMILES"].to_dict()
+    train_test_partition = lohi.hi_train_test_split(
                                 smiles=smiles, 
-                                similarity_threshhold=similarity_threshold, 
+                                similarity_threshold=similarity_threshold, 
                                 train_min_frac=train_frac, 
                                 test_min_frac=test_frac, 
-                                coarsening_fthreshold=coarsening_frac,
+                                coarsening_threshold=coarsening_frac,
                                 max_mip_gap=max_mip_gap
                                 )
     train_df = df.iloc[train_test_partition[0]]
