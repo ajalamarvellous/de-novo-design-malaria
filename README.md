@@ -42,7 +42,6 @@ This project seeks to use AI to discover novel drugs for anti-malarial.
     ├── main                  <- Main project backbone where everything is synced together.
     ├── virtual-screening     <- Machine learning screening section towards identifying great candidates from not so great ones.
     └── de-novo-design        <- Generative AI section towards de novo design of new candidates.
-
 ```
 
 <!-- GETTING STARTED -->
@@ -69,12 +68,10 @@ To get started and set up the project in your local environment, please download
    pip install requirements
    ```
 5. Checkout to the specific branch associated with the section you're working on
-   
-   for `virtual screening`
+    for `virtual screening`
    ```sh
    git checkout virtual-screening
    ```
-   
     for `de novo design`
    ```sh
    git checkout de-novo-design
@@ -102,6 +99,23 @@ df = pd.read_table("MalariaData_bioactivity.txt")
 ```
 
 Voila, there you go, you should have the data running
+
+<!-- SYNC-->
+## Updating contribution
+
+To ensure collaborations sync properly and avoid conflict, please ensure that you pull from the origin before you start coding
+
+```sh
+git pull origin <branch-name>
+```
+
+And once you're done coding your part before you log, please push it to the origin
+```sh
+git push origin <branch-name>
+```
+
+And there you go.... we should avoid conflicts this ways
+
 
 <!-- SYNC-->
 ## Updating contribution
