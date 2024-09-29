@@ -1,14 +1,22 @@
+from pathlib import Path
 from typing import Tuple
+
+import argparse
+import numpy as np
 import pandas as pd
-import lohi_splitter as lohi
+from rdkit import Chem
+from rdkit import DataStructs
+from rdkit.Chem import rdFingerprintGenerator
+
+# Fingerprint generators
+fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 
 def split_dataset(df: pd.DataFrame, 
-                  similarity_threshold: float, 
-                  train_frac: float,
-                  test_frac: float,
-                  coarsening_frac: float=0.4,
-                  max_mip_gap: float=0.01) -> Tuple[pd.DataFrame]:
+                  similarity_threshold: float,
+                  test_size: float,
+                  smiles_column: str="SMILES",
+                  fpgs: object=fpgs) -> Tuple[np.array]:
     """
     Splits the data into train and test set using Lo-Hi splitter
     ref: https://arxiv.org/abs/2310.06399
@@ -20,17 +28,12 @@ def split_dataset(df: pd.DataFrame,
     similarity_threshhold: float \n
         max similarity based on Tanimoto similarity that should exist \
         between training and test set
-    train_frac: float \n
-        min fraction of the dataset that should be in the train set
-    test_frac: float \n
+    test_size: float \n
         min fraction of the dataset that should be in the test set
-    coarsening_frac: float \n
-        threshold for graph clustering, used to tune the fraction \
-        of data to drop and how fast the computation should be
-    max_mip_gap: float (range 0-1)
-        how close to theoretical optimum to terminate operation, used \
-        to tune the fraction of data to drop and how fast the computation \
-        should be. Higher value to run faster and discard more molecules
+    smiles_column: str \n
+        column that contains the smiles value
+    fpgs: object \n
+        rdkit fingerprint generator
 
     Return(s)
     -----------
@@ -38,15 +41,38 @@ def split_dataset(df: pd.DataFrame,
         the splitted dataset in the order (train, test)
     """
 
-    smiles = df["SMILES"].to_dict()
-    train_test_partition = lohi.hi_train_test_split(
-                                smiles=smiles, 
-                                similarity_threshold=similarity_threshold, 
-                                train_min_frac=train_frac, 
-                                test_min_frac=test_frac, 
-                                coarsening_threshold=coarsening_frac,
-                                max_mip_gap=max_mip_gap
-                                )
-    train_df = df.iloc[train_test_partition[0]]
-    test_df = df.iloc[train_test_partition[1]]
-    return (train_df, test_df)
+    test_no = int(test_size * len(df))
+    test_dataset = []
+    fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
+
+    smiles = df[smiles_column].to_list()
+    mols = [Chem.MolFromSmiles(x) for x in smiles]
+    fps = [fpgs.GetFingerprint(x) for x in mols]
+    fps_idx = list(np.arange(len(fps)))
+
+    n = 0
+    new_points = [np.random.choice(fps_idx)]
+    while len(test_dataset) < test_no:
+        # print(new_points)
+        idx = new_points[n]
+        start = fps[idx]
+        fps_idx.remove(idx)
+        sim = np.array(DataStructs.BulkTanimotoSimilarity(start, [fps[i] for i in fps_idx]))
+        sim_comp = sim > similarity_threshold
+
+        test_dataset.append(idx)
+        # print(sum(sim_comp))
+        if sum(sim_comp) > 0:
+            for i, j in enumerate(sim_comp):
+                if j is True:
+                    new_points.append(i)
+                    fps_idx.pop(i)
+        if len(new_points) == n+1:
+            again = True
+            while again:
+                new_value = np.random.choice(fps_idx)
+                if new_value not in new_points:
+                    new_points.append(np.random.choice(fps_idx))
+                    again = False        
+        n += 1
+    return np.array(test_dataset), np.array(fps_idx), new_points
