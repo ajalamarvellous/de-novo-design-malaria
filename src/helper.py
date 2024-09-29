@@ -41,11 +41,13 @@ def split_dataset(df: pd.DataFrame,
         the splitted dataset in the order (train, test)
     """
 
+    
     test_no = int(test_size * len(df))
     test_dataset = []
     fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
 
-    smiles = df[smiles_column].to_list()
+
+    smiles = df.loc[:, "SMILES"].to_list()
     mols = [Chem.MolFromSmiles(x) for x in smiles]
     fps = [fpgs.GetFingerprint(x) for x in mols]
     fps_idx = list(np.arange(len(fps)))
@@ -53,26 +55,30 @@ def split_dataset(df: pd.DataFrame,
     n = 0
     new_points = [np.random.choice(fps_idx)]
     while len(test_dataset) < test_no:
-        # print(new_points)
         idx = new_points[n]
-        start = fps[idx]
-        fps_idx.remove(idx)
-        sim = np.array(DataStructs.BulkTanimotoSimilarity(start, [fps[i] for i in fps_idx]))
+        mol_fgp = fps[idx]
+        if idx in fps_idx:
+            fps_idx.remove(idx)
+        sim = np.array(
+            DataStructs.BulkTanimotoSimilarity(mol_fgp, [fps[i] for i in fps_idx])
+            )
         sim_comp = sim > similarity_threshold
 
         test_dataset.append(idx)
-        # print(sum(sim_comp))
         if sum(sim_comp) > 0:
-            for i, j in enumerate(sim_comp):
-                if j is True:
-                    new_points.append(i)
-                    fps_idx.pop(i)
+            print(f"\n Sum of values above threshhold: {sum(sim_comp)}", end=" ")
+            for i, j in enumerate(sim):
+                if j > similarity_threshold:
+                    idx_value = fps_idx[i]
+                    fps_idx.remove(idx_value)
+                    new_points.append(idx_value)
         if len(new_points) == n+1:
             again = True
             while again:
-                new_value = np.random.choice(fps_idx)
-                if new_value not in new_points:
-                    new_points.append(np.random.choice(fps_idx))
+                new_idx = np.random.choice(fps_idx)
+                if new_idx not in new_points:
+                    fps_idx.remove(new_idx)
+                    new_points.append(new_idx)
                     again = False        
         n += 1
-    return np.array(test_dataset), np.array(fps_idx), new_points
+    return np.array(test_dataset), np.array(fps_idx), np.array(new_points)
