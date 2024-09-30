@@ -82,3 +82,16 @@ def split_dataset(df: pd.DataFrame,
                     again = False        
         n += 1
     return np.array(test_dataset), np.array(fps_idx), np.array(new_points)
+
+
+def main(file_address):
+    file_folder = Path(file_address).parent
+    df = pd.read_csv(file_address)
+    train, test, _ = split_dataset(df,
+                              similarity_threshold=0.4, 
+                              test_set=0.3)
+    print(f"Len of splitted data: train {len(train)}, test {len(test)}")
+    print(f"Fraction of splitted data: \
+          train {len(train)/ len(df)}, test {len(test)/ len(df)}")
+    df.iloc[train].to_csv(file_folder/ "train.csv", index=False)
+    df.iloc[test].to_csv(file_folder/ "test.csv", index=False)
