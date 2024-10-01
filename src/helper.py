@@ -29,7 +29,7 @@ def split_dataset(df: pd.DataFrame,
         max similarity based on Tanimoto similarity that should exist \
         between training and test set
     test_size: float \n
-        min fraction of the dataset that should be in the test set
+        approx. fraction of the dataset that should be in the test set
     smiles_column: str \n
         column that contains the smiles value
     fpgs: object \n
@@ -43,19 +43,20 @@ def split_dataset(df: pd.DataFrame,
 
     
     test_no = int(test_size * len(df))
-    test_dataset = []
+    parsed = []
     fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
 
 
-    smiles = df.loc[:, "SMILES"].to_list()
+    smiles = df.loc[:, smiles_column].to_list()
     mols = [Chem.MolFromSmiles(x) for x in smiles]
     fps = [fpgs.GetFingerprint(x) for x in mols]
     fps_idx = list(np.arange(len(fps)))
 
     n = 0
-    new_points = [np.random.choice(fps_idx)]
-    while len(test_dataset) < test_no:
-        idx = new_points[n]
+    others = [np.random.choice(fps_idx)]
+    p = len(fps_idx) / len(df)
+    while p > test_size:
+        idx = others[n]
         mol_fgp = fps[idx]
         if idx in fps_idx:
             fps_idx.remove(idx)
@@ -64,34 +65,40 @@ def split_dataset(df: pd.DataFrame,
             )
         sim_comp = sim > similarity_threshold
 
-        test_dataset.append(idx)
+        parsed.append(idx)
         if sum(sim_comp) > 0:
-            print(f"\n Sum of values above threshhold: {sum(sim_comp)}", end=" ")
+            fps_idx_copy = fps_idx.copy()
             for i, j in enumerate(sim):
                 if j > similarity_threshold:
                     idx_value = fps_idx[i]
-                    fps_idx.remove(idx_value)
-                    new_points.append(idx_value)
-        if len(new_points) == n+1:
+                    fps_idx_copy.remove(idx_value)
+                    others.append(idx_value)
+            fps_idx = fps_idx_copy
+        if len(others) == n+1:
             again = True
             while again:
                 new_idx = np.random.choice(fps_idx)
-                if new_idx not in new_points:
+                if new_idx not in others:
                     fps_idx.remove(new_idx)
-                    new_points.append(new_idx)
+                    others.append(new_idx)
                     again = False        
         n += 1
-    return np.array(test_dataset), np.array(fps_idx), np.array(new_points)
+        if n % 500 == 0:
+            print(f"{n}/{test_no} done...")
+    return np.array(parsed), np.array(fps_idx), np.array(others)
 
 
 def main(file_address):
     file_folder = Path(file_address).parent
     df = pd.read_csv(file_address)
+    print("file loaded successfully...")
     train, test, _ = split_dataset(df,
                               similarity_threshold=0.4, 
-                              test_set=0.3)
-    print(f"Len of splitted data: train {len(train)}, test {len(test)}")
+                              test_size=0.3)
+    print(f"Len of splitted data: train {len(train)}, test {len(test)} others {len(_)}")
     print(f"Fraction of splitted data: \
-          train {len(train)/ len(df)}, test {len(test)/ len(df)}")
+          train {len(train)/ len(df)}, test {len(test)/ len(df)}, val test {len(_)/ len(df)}")
     df.iloc[train].to_csv(file_folder/ "train.csv", index=False)
     df.iloc[test].to_csv(file_folder/ "test.csv", index=False)
+    df.iloc[_].to_csv(file_folder/ "other.csv", index=False)
+
