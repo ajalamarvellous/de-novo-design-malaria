@@ -75,20 +75,21 @@ def split_dataset(df: pd.DataFrame,
         # add compared mol to list of parsed mols
         parsed.append(idx)
         # check if there's any similarity greater than threshhold and count no if any
-        if sum(sim_comp) > 0:
-            # create a copy of the indices of other mols left in the original list of mols examined
-            # this is because we will be removing some values from list while also trying to assess 
-            # the list using index (this means the index would have changed by the next iteration)
-            fps_idx_copy = fps_idx.copy()
-            for i, j in enumerate(sim):
+        n_greater = sum(sim_comp)  
+        sim_comp = list(sim_comp)   
+        if n_greater > 0:
+            for i in range(n_greater):
                 # if the similarity value is greater than threshold, add the index of mol 
                 # to others that will be compared while removing the idx from the original list of mols
-                if j > similarity_threshold:
-                    idx_value = fps_idx[i]
-                    fps_idx_copy.remove(idx_value)
-                    others.append(idx_value)
+                # list().index returns the index of first value that match, why we remove each after it 
+                # has been found
+                idx = sim_comp.index(True)
+                idx_value = fps_idx[idx]
+                fps_idx.remove(idx_value)
+                others.append(idx_value)
+                sim_comp.pop(idx)
             # set the new list of indices to the one with mols greater than threshhold removed
-            fps_idx = fps_idx_copy
+            # fps_idx = fps_idx_copy
         # if no mol has similarity greater than threshhold and no new mol has been added to others
         if len(others) == n+1:
             # while mol has not been previously added to others, randomly select one new compound
