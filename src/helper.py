@@ -92,17 +92,14 @@ def split_dataset(df: pd.DataFrame,
         # if no mol has similarity greater than threshhold and no new mol has been added to others
         if len(others) == n+1:
             # while mol has not been previously added to others, randomly select one new compound
-            again = True
-            while again:
-                new_idx = np.random.choice(fps_idx)
-                if new_idx not in others:
-                    fps_idx.remove(new_idx)
-                    others.append(new_idx)
-                    again = False        
+            new_idx = np.random.choice(fps_idx)
+            fps_idx.remove(new_idx)
+            others.append(new_idx)
         n += 1
+        p = len(fps_idx) / len(df)
         # print result at every 500 mols checkpoints
         if n % 500 == 0:
-            print(f"{n}/{test_no} done...")
+            print(f"{n}:{p} reached...")
     return np.array(parsed), np.array(fps_idx), np.array(others)
 
 
