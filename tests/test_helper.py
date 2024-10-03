@@ -29,7 +29,7 @@ def test_split_data(df):
     test_frac = 0.3
     fpg = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
-    test, train, _ = split_dataset(df, 
+    train, test, _ = split_dataset(df, 
                                       similarity_threshold=0.4,
                                       test_size=test_frac)
     
@@ -37,12 +37,12 @@ def test_split_data(df):
     test_df = df.iloc[test]
     
     
-    assert round(len(test_df)/len(df), 1) >= test_frac, "train set smaller than specified"
+    assert round(len(test_df)/len(df), 1) <= test_frac, "test set greater than specified"
 
-    train_df["FP"] = train_df.loc[:,"SMILES"].apply(
+    train_df.loc[:, "FP"] = train_df["SMILES"].apply(
         lambda x: fpg.GetFingerprint(Chem.MolFromSmiles(x))
         )
-    test_df["FP"] = test_df.loc[:,"SMILES"].apply(
+    test_df.loc[:, "FP"] = test_df["SMILES"].apply(
         lambda x: fpg.GetFingerprint(Chem.MolFromSmiles(x))
         )
     
@@ -54,9 +54,8 @@ def test_split_data(df):
     for s in sims:
         if (np.array(s) == 1).any():
             data_leakage = True
-        sns.histplot(s, binwidth=0.1)
     plt.savefig("visualizations/test_sim.png")
     assert data_leakage is False, "There is leakage of the test into the training"
     n_over = sum(np.array(sims).flatten() > 0.4)
-    assert n_over/len(test) < 0.1, f"Not properly separated, {n_over/len(test)} \
+    assert n_over == 0, f"Not properly separated, {n_over/len(test)} \
         with similarity value greater than threshold"
