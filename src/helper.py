@@ -104,7 +104,7 @@ def split_dataset(df: pd.DataFrame,
     return np.array(parsed), np.array(fps_idx), np.array(others)
 
 
-def main(file_address):
+def get_datasplits(file_address):
     file_folder = Path(file_address).parent
     df = pd.read_csv(file_address)
     print("file loaded successfully...")
@@ -118,3 +118,11 @@ def main(file_address):
     df.iloc[test].to_csv(file_folder/ "test.csv", index=False)
     df.iloc[_].to_csv(file_folder/ "other.csv", index=False)
 
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Splitting data into train and test set using lohi splitter")
+    parser.add_argument("--file_address", type=str)
+    args = parser.parse_args()
+
+    file = args.file_address
+    get_datasplits(file)
