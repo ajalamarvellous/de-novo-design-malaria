@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Tuple
+import logging
 
 import argparse
 import numpy as np
@@ -10,6 +11,13 @@ from rdkit.Chem import rdFingerprintGenerator
 
 # Fingerprint generators
 fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+
+# basic logging config
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(funcName)s[%(levelname)s]: %(message)s ",
+)
+logger = logging.getLogger()
 
 
 def split_dataset(df: pd.DataFrame, 
@@ -45,11 +53,13 @@ def split_dataset(df: pd.DataFrame,
     parsed = []
     fpgs = rdFingerprintGenerator.GetMorganGenerator(radius=2,fpSize=2048)
 
-
     smiles = df.loc[:, smiles_column].to_list()
     mols = [Chem.MolFromSmiles(x) for x in smiles]
+    logger.info("Mol retrieved from all mols")
+
     fps = [fpgs.GetFingerprint(x) for x in mols]
     fps_idx = list(np.arange(len(fps)))
+    logger.info("All fingerprints retrieved succesfully")
 
     n = 0
     others = [np.random.choice(fps_idx)]
@@ -78,13 +88,14 @@ def split_dataset(df: pd.DataFrame,
         n_greater = sum(sim_comp)  
         sim_comp = list(sim_comp)   
         if n_greater > 0:
+            logger.debug(f"{n_greater} mols found similar to selected mol idc{idx}")
             for i in range(n_greater):
                 # if the similarity value is greater than threshold, add the index of mol 
                 # to others that will be compared while removing the idx from the original list of mols
                 # list().index returns the index of first value that match, why we remove each after it 
                 # has been found
-                idx = sim_comp.index(True)
-                idx_value = fps_idx[idx]
+                idx_ = sim_comp.index(True)
+                idx_value = fps_idx[idx_]
                 fps_idx.remove(idx_value)
                 others.append(idx_value)
                 sim_comp.pop(idx)
@@ -100,29 +111,30 @@ def split_dataset(df: pd.DataFrame,
         p = len(fps_idx) / len(df)
         # print result at every 500 mols checkpoints
         if n % 500 == 0:
-            print(f"{n}:{p} reached...")
+            logger.info(f"{n}:{p} reached...")
     return np.array(parsed), np.array(fps_idx), np.array(others)
 
 
 def get_datasplits(file_address):
     file_folder = Path(file_address).parent
     df = pd.read_csv(file_address)
-    print("file loaded successfully...")
+    logger.info("file loaded successfully...")
     train, test, _ = split_dataset(df,
                               similarity_threshold=0.4, 
                               test_size=0.3)
-    print(f"Len of splitted data: train {len(train)}, test {len(test)} others {len(_)}")
-    print(f"Fraction of splitted data: \
+    logger.info("Splitting sucessfully completed")
+    logger.info(f"Len of splitted data: train {len(train)}, test {len(test)} others {len(_)}")
+    logger.info(f"Fraction of splitted data: \
           train {len(train)/ len(df)}, test {len(test)/ len(df)}, val test {len(_)/ len(df)}")
     df.iloc[train].to_csv(file_folder/ "train.csv", index=False)
     df.iloc[test].to_csv(file_folder/ "test.csv", index=False)
     df.iloc[_].to_csv(file_folder/ "other.csv", index=False)
+    logger.info("Files sucessfully saved, closing application...")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Splitting data into train and test set using lohi splitter")
     parser.add_argument("--file_address", type=str)
     args = parser.parse_args()
-
     file = args.file_address
     get_datasplits(file)
