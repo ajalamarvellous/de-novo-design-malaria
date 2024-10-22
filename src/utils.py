@@ -1,3 +1,5 @@
+from rdkit import Chem
+
 import pandas as pd
 import numpy as np
 
@@ -24,3 +26,23 @@ def read_file(file_address: addressType) -> pd.DataFrame:
     """
     df = pd.read_table(file_address, low_memory=False)
     return df
+
+def get_mols(df: pd.DataFrame, column: str) -> list:
+    """
+    Return the MOL for the smiles given
+
+    Argument(s)
+    ------------
+    df: pd.DataFrame \n
+        DataFrame containing the dataset
+
+    column: string \n
+        The name of the column containing the smiles
+
+    Return(s)
+    -----------
+    smiles: list \n
+        list of the rdkit MOLs for the smiles supplied
+    """
+    mols = [Chem.MolFromSmiles(x) for x in df[column]]
+    return mols
