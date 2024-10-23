@@ -1,4 +1,4 @@
-
+import argparse
 import pandas as pd
 import numpy as np
 
@@ -21,19 +21,17 @@ from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 
 
+def train_models(train_data: str, test_data: str) -> None:
 
-
-
-
-def train_models(train_data, test_data):
-
+    print("Getting train data...")
     train_df = read_file(train_data)
-    train_mols = get_mols(train_df, "SMILES")
+    train_mols = get_mols(train_df)
     X_train = get_fingerprints(train_mols)
     y_train = np.where(train_df["ACTIVITY"].values == True, 1, 0)
 
+    print("Getting test data...")
     test_df = read_file(test_data)
-    test_mols = get_mols(test_df, "SMILES")
+    test_mols = get_mols(test_df)
     X_test = get_fingerprints(test_mols)
     y_test = np.where(test_df["ACTIVITY"].values == True, 1, 0)
 
@@ -50,6 +48,7 @@ def train_models(train_data, test_data):
     ]
     n_folds = 5 
 
+    print("Beginning training...")
     # Evaluate each model in turn
     results = []
     for model in models:
@@ -64,6 +63,18 @@ def train_models(train_data, test_data):
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
         print(classification_report(y_test, predictions))
-        print(f"Number of positive {
-            confusion_matrix(y_test, predictions)[1,1]
-            } out of {sum(y_test)}")
+        print(f"Number of positive \
+              {confusion_matrix(y_test, predictions)[1,1]} \
+                out of {sum(y_test)}")
+        
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--train", type=str, default=None, help="Train dataset to train the model")
+    parser.add_argument("--test", type=str, default=None, help="Test dataset to evaluate the model")
+    args = parser.parse_args()
+
+    train_models(args.train, args.test)
+
+if __name__ == "__main__":
+    main()
+    
