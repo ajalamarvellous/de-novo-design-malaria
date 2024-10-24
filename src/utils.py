@@ -5,8 +5,15 @@ from rdkit.Chem import rdFingerprintGenerator
 import pandas as pd
 import numpy as np
 
-from typing import TypeVar, List, Union, NewType
 from pathlib import Path
+from typing import TypeVar, List, Union, NewType
+
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    confusion_matrix,
+)
 
 
 # defining new variable for our artifact locations
@@ -93,3 +100,29 @@ def get_fingerprints(
         fingerprints = fingerprnt_gen.GetFingerprints(mols)
     return fingerprints
     
+
+def get_metrics(y_test: np.array, y_pred: np.array) -> dict:
+    """
+    Get and return basic metrics to evaluate the model performance
+    Specifically return: Accuracy, precision, recall, n_true_pos, n_false_pos
+    
+    Argument(s)
+    ------------
+    y_tests: np.array \n
+        value of ground truths 
+
+    y_pred: np.array \n
+        value of the predicted values 
+
+    Return(s)
+    -----------
+    metric: dict \n
+        dictionary of the metrics
+    """
+    metrics = {}
+    metrics["Accuracy"] = accuracy_score(y_test, y_pred)
+    metrics["Precision"] = precision_score(y_test, y_pred)
+    metrics["Recall"] = recall_score(y_test, y_pred)
+    metrics["True_positives"] = confusion_matrix(y_test, y_pred)[1, 1]
+    metrics["False_positives"] = confusion_matrix(y_test, y_pred)[0, 1]
+    return metrics

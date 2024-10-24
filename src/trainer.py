@@ -7,7 +7,7 @@ from rdkit.Chem import rdFingerprintGenerator
 from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 
-from utils import read_file, get_mols, get_fingerprints
+from utils import read_file, get_mols, get_fingerprints, get_metrics
 # Import necessary libraries
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.neighbors import KNeighborsClassifier
@@ -18,7 +18,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix
 
 
 def train_models(train_data: str, test_data: str) -> None:
@@ -62,10 +61,14 @@ def train_models(train_data: str, test_data: str) -> None:
 
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
-        print(classification_report(y_test, predictions))
-        print(f"Number of positive \
-              {confusion_matrix(y_test, predictions)[1,1]} \
-                out of {sum(y_test)}")
+        metrics = get_metrics(y_test, predictions)
+        
+        print(f"Accuracy: {metrics['Accuracy']} \n \
+                Precision: {metrics['Precision']} \n \
+                Recall: {metrics['Recall']} \n \
+                True Positives: {metrics['True_positives']} \n \
+                False Positives: {metrics['False_positives']} \n \
+                Total positives: {sum(y_test)}")
         
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
