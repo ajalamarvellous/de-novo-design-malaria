@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 
 from pathlib import Path
-from typing import TypeVar, List, Union, NewType
+from typing import TypeVar, List, Tuple, Union, NewType
 
 from sklearn.metrics import (
     accuracy_score,
@@ -20,6 +20,7 @@ from sklearn.metrics import (
 addressType = TypeVar("addressType", str, Path)
 molType = NewType("molType", Chem.rdchem.Mol)
 fngrprntType = NewType("fngrprntType", cDataStructs.ExplicitBitVect)
+
 
 def read_file(file_address: addressType, dtype="csv") -> pd.DataFrame:
     """
@@ -43,6 +44,7 @@ def read_file(file_address: addressType, dtype="csv") -> pd.DataFrame:
     else:
         df = pd.read_table(file_address, low_memory=False)
     return df
+
 
 def get_mols(df: pd.DataFrame, column: str="SMILES") -> List[molType]:
     """
@@ -100,6 +102,40 @@ def get_fingerprints(
         fingerprints = fingerprnt_gen.GetFingerprints(mols)
     return fingerprints
     
+
+def prepare_data(
+        file_name: Union[str, Path], smiles_col: str="SMILES", target_col: str="ACTIVITY"
+        ) -> Tuple[np.array]:
+    """
+    Combination of read_file, get_mols and get_fingerprint plus y_data preprocssing
+    
+    Argument(s)
+    ------------
+    file_name: Union[str, Path] \n
+        file address of the dataset to be returned    
+
+    smiles_col: str \n
+        name of the smile column    
+
+    target_col: str \n
+        name of the target column
+    
+    Return(s)
+    -----------
+    dataset: Tuple[np.array] \n
+        Tuple of the processed dataset in the order (X, y)
+
+    Sequence 
+    ---------
+    read_file -> get_mols -> get_fingerprints -> preprocess_y -> final_dataset
+    """
+
+    df = read_file(file_name)
+    mols = get_mols(df, smiles_col)
+    X = get_fingerprints(mols)
+    y = np.where(df[target_col].values == True, 1, 0)
+    return (X, y)
+
 
 def get_metrics(y_test: np.array, y_pred: np.array) -> dict:
     """
