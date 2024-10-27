@@ -6,7 +6,7 @@ from typing import List, TypeVar
 
 import pandas as pd
 import argparse
-
+from utils import read_file, addressType
 
 # basic logging config
 logging.basicConfig(
@@ -137,7 +137,7 @@ def main(
          VIRTUAL_SCREENING_DS: addressType, 
          DENOVO_DS: addressType
     ) -> None:
-    df = read_file(FILE_ADDRESS)
+    df = read_file(FILE_ADDRESS, dtype="txt")
     describe_data(df)
     df = subselect_data(df)
     df = lowercase_column(df)
