@@ -8,11 +8,15 @@ import numpy as np
 from pathlib import Path
 from typing import TypeVar, List, Tuple, Union, NewType
 
+
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
     confusion_matrix,
+    roc_auc_score,
+    roc_curve,
+    precision_recall_curve
 )
 
 
@@ -137,7 +141,7 @@ def prepare_data(
     return (X, y)
 
 
-def get_metrics(y_test: np.array, y_pred: np.array) -> dict:
+def get_metrics(y_test: np.array, y_pred: np.array, baseline: float) -> dict:
     """
     Get and return basic metrics to evaluate the model performance
     Specifically return: Accuracy, precision, recall, n_true_pos, n_false_pos
@@ -155,10 +159,24 @@ def get_metrics(y_test: np.array, y_pred: np.array) -> dict:
     metric: dict \n
         dictionary of the metrics
     """
+    predicted_class = np.where(y_pred > baseline, 1, 0)
     metrics = {}
-    metrics["Accuracy"] = accuracy_score(y_test, y_pred)
-    metrics["Precision"] = precision_score(y_test, y_pred)
-    metrics["Recall"] = recall_score(y_test, y_pred)
-    metrics["True_positives"] = confusion_matrix(y_test, y_pred)[1, 1]
-    metrics["False_positives"] = confusion_matrix(y_test, y_pred)[0, 1]
+
+    precision, recall, thresshold = precision_recall_curve(y_test, y_pred)
+    fpr, tpr, threshold = roc_curve(y_test, y_pred)
+
+    metrics["Accuracy"] = accuracy_score(y_test, predicted_class)
+    metrics["Precision"] = precision_score(y_test, predicted_class)
+    metrics["Recall"] = recall_score(y_test, predicted_class)
+    metrics["True_positives"] = confusion_matrix(y_test, predicted_class)[1, 1]
+    metrics["False_positives"] = confusion_matrix(y_test, predicted_class)[0, 1]
+    metrics["ROC_AUC_Score"] = roc_auc_score(y_test, y_pred)
+    metrics["Precision_recall_curve"] = {
+        "precision": precision,
+        "recall": recall,
+    }
+    metrics["roc_curve"]= {
+        "fpr": fpr,
+        "tpr": tpr,
+    }
     return metrics
