@@ -5,27 +5,32 @@ import mlflow
 from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 
+import numpy as np
+import matplotlib.pyplot as plt
 from utils import prepare_data, get_metrics
+
 # Import necessary libraries
-from sklearn.model_selection import cross_val_score, KFold
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import (
+    GridSearchCV, KFold, cross_val_score)
+
+from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
-from sklearn.gaussian_process import GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import RBF
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
+from xgboost import XGBClassifier
 
+from models import NNClassifier
 
-def mlflow_logging(name: str, class_weighted: bool, metrics: dict) -> None:
+def mlflow_logging(model, params: dict, metrics: dict) -> None:
     """
     Function to log to mlflow
     
     Argument(s)
     ------------
-    name: str \n
-        Name of the model to log 
+    model: str \n
+        the model whose parameters are to be logged
 
     class_weighted: bool \n
         information whether the model was passed with class_weigh
@@ -33,18 +38,26 @@ def mlflow_logging(name: str, class_weighted: bool, metrics: dict) -> None:
     metrics: dict \n
         the metrics to be logged   
     """
+    Precision_recall_curve = metrics.pop("Precision_recall_curve")
+    fig1, ax1 = plt.subplots()
+    ax1.plot(Precision_recall_curve["precision"],
+            Precision_recall_curve["recall"])
+    plt.title("Precison recall curve")
+
+    roc_curve = metrics.pop("roc_curve")
+    fig2, ax2 = plt.subplots()
+    ax2.plot(roc_curve["fpr"],
+            roc_curve["tpr"])
+    plt.title("ROC curve")
+
     with mlflow.start_run():
-        mlflow.log_param("model_name", name)
-        mlflow.log_param("class_weighted", class_weighted)
+        mlflow.log_params(params)
+        mlflow.log_params(model.get_params())
+        mlflow.log_metrics(metrics)
+        mlflow.log_figure(fig1, "precision_recall_graph.png")
+        mlflow.log_figure(fig2, "ROC_Curve.png")
 
-        mlflow.log_metric("Accuracy", metrics["Accuracy"])
-        mlflow.log_metric("Precision", metrics["Precision"])
-        mlflow.log_metric("Recall", metrics["Recall"])
-        mlflow.log_metric("True Positives", metrics["True_positives"])
-        mlflow.log_metric("False Positives", metrics["False_positives"])
-
-
-def train_models(train_data: str, test_data: str) -> None:
+def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
 
     print("Getting train data...")
     X_train, y_train = prepare_data(train_data)
@@ -72,6 +85,8 @@ def train_models(train_data: str, test_data: str) -> None:
     for model in models:
         name = model.__str__().split("(")[0]
         print(f"Training {name} now...")
+        start_time = time.time()
+
         kfold = KFold(n_splits=n_folds)
         cv_results = cross_val_score(model, X_train, y_train, cv=kfold, scoring="accuracy")
         results.append(cv_results)
@@ -81,14 +96,19 @@ def train_models(train_data: str, test_data: str) -> None:
         model.fit(X_train, y_train)
         predictions = model.predict(X_test)
         metrics = get_metrics(y_test, predictions)
+        params = {"name": name,
+                  "Data type": "Fingerprints",
+                  "Run_time": time.time() - start_time}
         
-        mlflow_logging(name=name, class_weighted=False, metrics=metrics)
+        mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
         print(f"Accuracy: {metrics['Accuracy']} \n \
                 Precision: {metrics['Precision']} \n \
                 Recall: {metrics['Recall']} \n \
                 True Positives: {metrics['True_positives']} \n \
                 False Positives: {metrics['False_positives']} \n \
-                Total positives: {sum(y_test)}")
+                Total positives: {sum(y_test)} \n \
+                Total positive predicted values: {sum(predictions)} \n \
+                Runtime: {params['Run_time']}s")
         
 
 def main():
@@ -99,7 +119,6 @@ def main():
     args = parser.parse_args()
 
     # setting mlflow parameters
-    print("Path exists: ", os.path.exists(args.mlflow_tracking_uri))
     mlflow.set_tracking_uri(args.mlflow_tracking_uri)
     mlflow.set_experiment("Malaria project")
     train_models(args.train, args.test)
