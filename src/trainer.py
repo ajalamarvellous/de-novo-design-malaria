@@ -1,8 +1,7 @@
-import os
+import time
 import argparse
 
 import mlflow
-from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 
 import numpy as np
@@ -61,41 +60,85 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
 
     print("Getting train data...")
     X_train, y_train = prepare_data(train_data)
+    class_weight = dict(
+        zip([0,1], np.bincount(y_train)/ len(y_train))
+    )
+    print(X_train.shape, y_train.shape)
 
     print("Getting test data...")
     X_test, y_test = prepare_data(test_data)
 
-    models = [
-        LogisticRegression(),
-        GaussianProcessClassifier(1.0 * RBF(1.0)),
-        DecisionTreeClassifier(max_depth=5),
-        RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
-        MLPClassifier(alpha=1),
-        AdaBoostClassifier(),
-        GaussianNB(),
-        SVC(kernel='linear'),
-        SVC(kernel='rbf'),
-        SVC(kernel='sigmoid')
-    ]
-    n_folds = 5 
+    params_list = {
+        "LogisticRegression": {
+            "class_weight": [None, class_weight],
+            "C": np.linspace(0.001, 1, 11),
+        },
+        "DecisionTreeClassifier": {
+            "class_weight": [None, class_weight],
+            "max_depth": np.arange(1, 10),
+            "max_features": list(map(round, np.linspace(10, 200, 10))),
+        },
+        "RandomForestClassifier": {
+            "class_weight": [None, class_weight],
+            "max_depth": np.arange(1, 10),
+            "n_estimators": np.arange(20, 200, 20),
+            "max_features": list(map(round, np.linspace(10, 200, 10))),
+        },
+        "AdaBoostClassifier": {
+            "class_weight": [None, class_weight],
+            "max_depth": np.arange(1, 10),
+            "n_estimators": np.arange(20, 200, 20),
+            "learning_rate": np.linspace(0.001, 1, 11),
+        },
+        "XGBClassifier": {
+            "class_weight": [None, class_weight],
+            "max_depth": np.arange(1, 10),
+            "n_estimators": np.arange(100, 1000, 100),
+            "learning_rate": np.linspace(0.001, 1, 11),
+        },
+        "MLPClassifier": {
+            "class_weight": [None, class_weight],
+            "alpha": np.linspace(0.0001, 1, 10), 
+            "batch_size": [16, 32, 64, 128], 
+            "learning_rate_init": np.linspace(0.001, 0.1, 5),
+            "max_iter": np.arange(100, 500, 100),
+        },
+        "GaussianNB": {
+            "class_weight": [None, class_weight],
+            "var_smoothing": np.linspace(1e-10, 1, 10)   
+        }
+        }
 
+    models = [
+       # NNClassifier(
+        # input_size=X_train.shape[1], hidden_size=[512],
+        # batch_size=10, epochs=10) ]
+        LogisticRegression(random_state=SEED),
+        DecisionTreeClassifier(random_state=SEED),
+        RandomForestClassifier(random_state=SEED),
+        MLPClassifier(random_state=SEED),
+        AdaBoostClassifier(random_state=SEED),
+        GaussianNB(),
+        XGBClassifier(objective="binary:logistic", random_state=SEED)
+    ]
+   
+    n_folds = 5 
+   
     print("Beginning training...")
     # Evaluate each model in turn
-    results = []
     for model in models:
         name = model.__str__().split("(")[0]
+        params = params_list[name]
         print(f"Training {name} now...")
         start_time = time.time()
 
         kfold = KFold(n_splits=n_folds)
-        cv_results = cross_val_score(model, X_train, y_train, cv=kfold, scoring="accuracy")
-        results.append(cv_results)
-        print(f"Cross validation ({n_folds}) done \n  \
-            Accuracy: {cv_results.mean()} +/- {cv_results.std()}")
+        grid_search = GridSearchCV(model, params, scoring="accuracy", cv=kfold, n_jobs=-1)
+        grid_search.fit(X_train, y_train)
+        print(f"Best score: {grid_search.best_score_}")
 
-        model.fit(X_train, y_train)
-        predictions = model.predict(X_test)
-        metrics = get_metrics(y_test, predictions)
+        predictions = grid_search.predict_proba(X_test)[:, 1]
+        metrics = get_metrics(y_test, predictions, baseline=0.5)
         params = {"name": name,
                   "Data type": "Fingerprints",
                   "Run_time": time.time() - start_time}
@@ -109,7 +152,7 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
                 Total positives: {sum(y_test)} \n \
                 Total positive predicted values: {sum(predictions)} \n \
                 Runtime: {params['Run_time']}s")
-        
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
