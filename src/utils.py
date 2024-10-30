@@ -2,8 +2,10 @@ from rdkit import Chem
 from rdkit.DataStructs import cDataStructs
 from rdkit.Chem import rdFingerprintGenerator
 
+import tqdm
 import pandas as pd
 import numpy as np
+from itertools import product
 
 from pathlib import Path
 from typing import TypeVar, List, Tuple, Union, NewType
@@ -180,3 +182,58 @@ def get_metrics(y_test: np.array, y_pred: np.array, baseline: float) -> dict:
         "tpr": tpr,
     }
     return metrics
+
+
+class GridSearch:
+    def __init__(self, model, params_grid, scoring, other_params, top_n=5):
+        self.model = model
+        self._params_grid = self._get_param_combination(params_grid)
+        self._scoring = scoring
+        self._top_n = top_n
+        self._other_params = other_params
+        self._all_params = {}
+        self._best_params = {}
+        self.best_score_ = 0
+        self.best_estimator_ = None
+
+    def fit(self, X, y):
+        print(f"Training {len(self._params_grid)} cobinations")
+        for param in tqdm.tqdm(self._params_grid):
+            if self._other_params != {}:
+                param.update(self._other_params)
+            model = self._set_params(param)
+            model.fit(X, y)
+            preds = model.predict(X)
+            metric = self._get_metric(y, preds)
+            self._all_params[metric] = param
+            if metric > self.best_score_:
+                self.best_score_ = metric
+                self.best_estimator_ = model
+                self._best_params = param
+        self._sort_top_params()
+
+    def _get_param_combination(self,params):
+        keys = list(params.keys())
+        combinations = list(product(*params.values()))
+        c = [dict((k,v) for k,v in zip(keys,values)) for values in combinations]
+        return c
+
+    def _set_params(self, params):
+        return self.model(**params)
+    
+    def _get_metric(self, y_true, y_pred):
+        if self._scoring == "accuracy":
+            return accuracy_score(y_true, y_pred)
+        elif self._scoring == "precision":
+            return precision_score(y_true, y_pred)
+        elif self._scoring == "recall":
+            return accuracy_score(y_true, y_pred)
+        elif self._scoring == "roc_auc":
+            return roc_auc_score(y_true, y_pred)
+        
+    def _sort_top_params(self):
+        all_keys = list(self._all_params.keys())
+        top_n = np.sort(all_keys)[-self._top_n:]
+        for key in all_keys:
+            if key not in top_n:
+                del self._all_params[key]
