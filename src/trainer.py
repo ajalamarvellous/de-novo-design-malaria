@@ -6,7 +6,9 @@ from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import prepare_data, get_metrics
+from utils import (prepare_data, 
+                   get_metrics,
+                   GridSearch)
 
 # Import necessary libraries
 from sklearn.model_selection import (
@@ -80,78 +82,81 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
         },
         "RandomForestClassifier": {
             "class_weight": [None, class_weight],
-            "max_depth": np.arange(1, 10),
-            "n_estimators": np.arange(20, 200, 20),
+            "max_depth": np.arange(2, 11, 2),
+            "n_estimators": np.arange(50, 210, 50),
             "max_features": list(map(round, np.linspace(10, 200, 10))),
         },
         "AdaBoostClassifier": {
-            "class_weight": [None, class_weight],
-            "max_depth": np.arange(1, 10),
-            "n_estimators": np.arange(20, 200, 20),
+            "n_estimators": np.arange(50, 201, 50),
             "learning_rate": np.linspace(0.001, 1, 11),
         },
         "XGBClassifier": {
-            "class_weight": [None, class_weight],
-            "max_depth": np.arange(1, 10),
-            "n_estimators": np.arange(100, 1000, 100),
+            "sample_weight": [None, class_weight],
+            "max_depth": np.arange(2, 11, 2),
+            "n_estimators": np.arange(200, 1001, 200),
             "learning_rate": np.linspace(0.001, 1, 11),
         },
         "MLPClassifier": {
-            "class_weight": [None, class_weight],
-            "alpha": np.linspace(0.0001, 1, 10), 
+            "alpha": [0.001, 0.01, 0.1, 1, 10], 
             "batch_size": [16, 32, 64, 128], 
-            "learning_rate_init": np.linspace(0.001, 0.1, 5),
-            "max_iter": np.arange(100, 500, 100),
+            "learning_rate_init": [0.001, 0.01, 0.1 ],
+            "max_iter": [100, 250, 500, 1000],
         },
         "GaussianNB": {
-            "class_weight": [None, class_weight],
             "var_smoothing": np.linspace(1e-10, 1, 10)   
         }
         }
 
-    models = [
-       # NNClassifier(
-        # input_size=X_train.shape[1], hidden_size=[512],
-        # batch_size=10, epochs=10) ]
-        LogisticRegression(random_state=SEED),
-        DecisionTreeClassifier(random_state=SEED),
-        RandomForestClassifier(random_state=SEED),
-        MLPClassifier(random_state=SEED),
-        AdaBoostClassifier(random_state=SEED),
-        GaussianNB(),
-        XGBClassifier(objective="binary:logistic", random_state=SEED)
-    ]
-   
     n_folds = 5 
-   
     print("Beginning training...")
-    # Evaluate each model in turn
+    models = [
+        (LogisticRegression, {"random_state": SEED}),  
+            (DecisionTreeClassifier, {"random_state": SEED}),
+            (RandomForestClassifier, {"random_state":SEED}),
+            (MLPClassifier, {"random_state":SEED, 
+                             "early_stopping": True}),
+            (AdaBoostClassifier, {"random_state":SEED,
+                                  "algorithm": "SAMME"}),
+            (GaussianNB, {}),
+            (XGBClassifier, {"objective":"binary:logistic",
+                             "random_state":SEED, "n_jobs":-1})
+                             ]
+  
     for model in models:
-        name = model.__str__().split("(")[0]
-        params = params_list[name]
+        name = str(model[0]).split(".")[-1].split("'")[0]
+        print(name)
         print(f"Training {name} now...")
         start_time = time.time()
 
         kfold = KFold(n_splits=n_folds)
-        grid_search = GridSearchCV(model, params, scoring="accuracy", cv=kfold, n_jobs=-1)
+        grid_search = GridSearch(model[0], params_list[name], "accuracy", other_params=model[1])
         grid_search.fit(X_train, y_train)
-        print(f"Best score: {grid_search.best_score_}")
+        print(f"Best score: {grid_search.best_score_}, ")
+        for _, param in grid_search._all_params.items():
+            cross_val = cross_val_score(grid_search._set_params(param),
+                                        X_train,
+                                        y_train,
+                                        cv=kfold,
+                                        n_jobs=-1)
+            print(f"Cross validation score {np.mean(cross_val)} +/- {np.std(cross_val)}")
 
-        predictions = grid_search.predict_proba(X_test)[:, 1]
-        metrics = get_metrics(y_test, predictions, baseline=0.5)
-        params = {"name": name,
-                  "Data type": "Fingerprints",
-                  "Run_time": time.time() - start_time}
-        
-        mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
-        print(f"Accuracy: {metrics['Accuracy']} \n \
-                Precision: {metrics['Precision']} \n \
-                Recall: {metrics['Recall']} \n \
-                True Positives: {metrics['True_positives']} \n \
-                False Positives: {metrics['False_positives']} \n \
-                Total positives: {sum(y_test)} \n \
-                Total positive predicted values: {sum(predictions)} \n \
-                Runtime: {params['Run_time']}s")
+            model = grid_search._set_params(param)
+            model.fit(X_train, y_train)
+            predictions = model.predict_proba(X_test)[:, 1]
+            metrics = get_metrics(y_test, predictions, baseline=0.5)
+            params = {"name": name,
+                    "Data type": "Fingerprints",
+                    "Run_time": time.time() - start_time}
+            
+            mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
+            print(f"Accuracy: {metrics['Accuracy']} \n \
+                    Precision: {metrics['Precision']} \n \
+                    Recall: {metrics['Recall']} \n \
+                    True Positives: {metrics['True_positives']} \n \
+                    False Positives: {metrics['False_positives']} \n \
+                    Total positives: {sum(y_test)} \n \
+                    Total positive predicted values: {sum(np.where(predictions > 0.5, 1, 0))} \n \
+                    Runtime: {params['Run_time']}s")
 
 
 def main():
