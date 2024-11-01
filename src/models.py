@@ -52,6 +52,7 @@ class NNClassifier:
         batch_size: int = 120,
         epochs: int=100,
         lr: float=0.1,
+        seed: int=2024,
         metrics: dict = {},
         model_dir: str= "../models",
         track_mlflow: bool=True,
@@ -60,6 +61,9 @@ class NNClassifier:
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.drop_out = 0.5
+
+        self.set_seed()
+
         self.model = Model(self.input_size, self.hidden_size,) # drop_out=self.drop_out)
 
         if class_weight != None:
@@ -155,6 +159,10 @@ class NNClassifier:
                 "optimiser": "Adam", # Do not forget to alway change depending on what is used
                 "loss_func": "BCELoss", # Do not forget to alway change depending on what is used
                 }
+    
+    def set_seed(self, SEED):
+        torch.manual_seed(SEED)
+
 
 
 class CustomDataset(Dataset):
