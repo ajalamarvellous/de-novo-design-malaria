@@ -1,6 +1,8 @@
+import os
 from rdkit import Chem
 from rdkit.DataStructs import cDataStructs
 from rdkit.Chem import rdFingerprintGenerator
+from molfeat.trans.fp import FPVecTransformer
 
 import tqdm
 import pandas as pd
@@ -110,7 +112,10 @@ def get_fingerprints(
     
 
 def prepare_data(
-        file_name: Union[str, Path], smiles_col: str="SMILES", target_col: str="ACTIVITY"
+        file_name: Union[str, Path], 
+        datatype: str,
+        smiles_col: str="SMILES", 
+        target_col: str="ACTIVITY",
         ) -> Tuple[np.array]:
     """
     Combination of read_file, get_mols and get_fingerprint plus y_data preprocssing
@@ -119,6 +124,10 @@ def prepare_data(
     ------------
     file_name: Union[str, Path] \n
         file address of the dataset to be returned    
+
+    datatype: str \n
+        type of output desired, options are
+        [Fingerprints, Descriptors] 
 
     smiles_col: str \n
         name of the smile column    
@@ -137,8 +146,11 @@ def prepare_data(
     """
 
     df = read_file(file_name)
-    mols = get_mols(df, smiles_col)
-    X = get_fingerprints(mols)
+    if datatype == "Fingerprints":
+        mols = get_mols(df, smiles_col)
+        X = get_fingerprints(mols)
+    elif datatype == "Descriptors":
+        X = get_descriptors(df, smiles_col)
     y = np.where(df[target_col].values == True, 1, 0)
     return (X, y)
 
@@ -237,3 +249,27 @@ class GridSearch:
         for key in all_keys:
             if key not in top_n:
                 del self._all_params[key]
+
+
+def get_descriptors(df: pd.DataFrame, column: str="SMILES") -> np.array:
+    """
+    Return the 2D descriptors for the smiles given
+
+    Argument(s)
+    ------------
+    df: pd.DataFrame \n
+        DataFrame containing the dataset
+
+    column: string \n
+        The name of the column containing the smiles
+
+    Return(s)
+    -----------
+    smiles: list \n
+        list of the rdkit MOLs for the smiles supplied
+    """
+    smi_list = df[column].values
+    transformer = FPVecTransformer(kind="desc2D", dtype=float)
+    descriptors = transformer(smi_list)
+    os.system("clear")
+    return descriptors
