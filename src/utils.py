@@ -114,6 +114,7 @@ def get_fingerprints(
 def prepare_data(
         file_name: Union[str, Path], 
         datatype: str,
+        dataset: str,
         smiles_col: str="SMILES", 
         target_col: str="ACTIVITY",
         ) -> Tuple[np.array]:
@@ -127,7 +128,10 @@ def prepare_data(
 
     datatype: str \n
         type of output desired, options are
-        [Fingerprints, Descriptors] 
+        [Fingerprints, Descriptors]
+
+    dataset: str \n
+        the dataset passed in whether test or train
 
     smiles_col: str \n
         name of the smile column    
@@ -150,7 +154,7 @@ def prepare_data(
         mols = get_mols(df, smiles_col)
         X = get_fingerprints(mols)
     elif datatype == "Descriptors":
-        X = get_descriptors(df, smiles_col)
+        X = get_descriptors(df, dataset, smiles_col)
     y = np.where(df[target_col].values == True, 1, 0)
     return (X, y)
 
@@ -251,7 +255,7 @@ class GridSearch:
                 del self._all_params[key]
 
 
-def get_descriptors(df: pd.DataFrame, column: str="SMILES") -> np.array:
+def get_descriptors(df: pd.DataFrame, dataset: str, column: str="SMILES") -> np.array:
     """
     Return the 2D descriptors for the smiles given
 
@@ -259,6 +263,9 @@ def get_descriptors(df: pd.DataFrame, column: str="SMILES") -> np.array:
     ------------
     df: pd.DataFrame \n
         DataFrame containing the dataset
+
+    dataset: str \n
+        description of the data set, whether train or test
 
     column: string \n
         The name of the column containing the smiles
@@ -269,7 +276,13 @@ def get_descriptors(df: pd.DataFrame, column: str="SMILES") -> np.array:
         list of the rdkit MOLs for the smiles supplied
     """
     smi_list = df[column].values
-    transformer = FPVecTransformer(kind="desc2D", dtype=float)
-    descriptors = transformer(smi_list)
-    os.system("clear")
+    file_name = Path(__file__).parents[1]/ f"data/{dataset}.npy"
+    if file_name.exists():
+        descriptors = np.load(file_name)
+    else:
+        transformer = FPVecTransformer(kind="desc2D", dtype=float)
+        descriptors = transformer(smi_list)
+        descriptors = np.nan_to_num(descriptors)
+        np.save(file_name, descriptors)
+        os.system("clear")
     return descriptors
