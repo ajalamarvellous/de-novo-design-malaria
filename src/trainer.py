@@ -14,6 +14,7 @@ from utils import (prepare_data,
 from sklearn.model_selection import (
     GridSearchCV, KFold, cross_val_score)
 
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.tree import DecisionTreeClassifier
@@ -58,17 +59,21 @@ def mlflow_logging(model, params: dict, metrics: dict) -> None:
         mlflow.log_figure(fig1, "precision_recall_graph.png")
         mlflow.log_figure(fig2, "ROC_Curve.png")
 
-def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
+def train_models(train_data: str, test_data: str, datatype: str, SEED: int=2024) -> None:
 
+    scaler = StandardScaler()
     print("Getting train data...")
-    X_train, y_train = prepare_data(train_data)
+    X_train, y_train = prepare_data(train_data, datatype="Descriptors", dataset="train")
     class_weight = dict(
         zip([0,1], np.bincount(y_train)/ len(y_train))
     )
-    print(X_train.shape, y_train.shape)
+    X_train_scaled = scaler.fit_transform(X_train)
+    print("Trainset", X_train.shape, y_train.shape)
 
     print("Getting test data...")
-    X_test, y_test = prepare_data(test_data)
+    X_test, y_test = prepare_data(test_data, datatype="Descriptors", dataset="test")
+    print("Testset", X_test.shape, y_test.shape)
+    X_test_scaled = scaler.transform(X_test)
 
     params_list = {
         "LogisticRegression": {
@@ -91,7 +96,6 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
             "learning_rate": np.linspace(0.001, 1, 11),
         },
         "XGBClassifier": {
-            "sample_weight": [None, class_weight],
             "max_depth": np.arange(2, 11, 2),
             "n_estimators": np.arange(200, 1001, 200),
             "learning_rate": np.linspace(0.001, 1, 11),
@@ -110,7 +114,7 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
     n_folds = 5 
     print("Beginning training...")
     models = [
-        (LogisticRegression, {"random_state": SEED}),  
+            (LogisticRegression, {"random_state": SEED}),  
             (DecisionTreeClassifier, {"random_state": SEED}),
             (RandomForestClassifier, {"random_state":SEED}),
             (MLPClassifier, {"random_state":SEED, 
@@ -128,48 +132,61 @@ def train_models(train_data: str, test_data: str, SEED: int=2024) -> None:
         print(f"Training {name} now...")
         start_time = time.time()
 
-        kfold = KFold(n_splits=n_folds)
-        grid_search = GridSearch(model[0], params_list[name], "accuracy", other_params=model[1])
-        grid_search.fit(X_train, y_train)
-        print(f"Best score: {grid_search.best_score_}, ")
-        for _, param in grid_search._all_params.items():
-            cross_val = cross_val_score(grid_search._set_params(param),
-                                        X_train,
-                                        y_train,
-                                        cv=kfold,
-                                        n_jobs=-1)
-            print(f"Cross validation score {np.mean(cross_val)} +/- {np.std(cross_val)}")
+        if name == "LogisticRegression" or name == "MLPClassifier":
+            train_loop(model, params_list, X_train_scaled, y_train, 
+                       X_test_scaled, y_test, name, datatype, 
+                       start_time, n_folds)
+        else:
+            train_loop(model, params_list, X_train, y_train, 
+                       X_test, y_test, name, datatype, 
+                       start_time, n_folds)
 
-            model = grid_search._set_params(param)
-            model.fit(X_train, y_train)
-            predictions = model.predict_proba(X_test)[:, 1]
-            metrics = get_metrics(y_test, predictions, baseline=0.5)
-            params = {"name": name,
-                    "Data type": "Fingerprints",
-                    "Run_time": time.time() - start_time}
-            
-            mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
-            print(f"Accuracy: {metrics['Accuracy']} \n \
-                    Precision: {metrics['Precision']} \n \
-                    Recall: {metrics['Recall']} \n \
-                    True Positives: {metrics['True_positives']} \n \
-                    False Positives: {metrics['False_positives']} \n \
-                    Total positives: {sum(y_test)} \n \
-                    Total positive predicted values: {sum(np.where(predictions > 0.5, 1, 0))} \n \
-                    Runtime: {params['Run_time']}s")
+
+def train_loop(model, params_list, X_train, y_train, X_test, y_test, name, datatype, start_time, n_folds ):
+    kfold = KFold(n_splits=n_folds)
+    grid_search = GridSearch(model[0], params_list[name], "accuracy", other_params=model[1])
+    grid_search.fit(X_train, y_train)
+    print(f"Best score: {grid_search.best_score_}, ")
+    for _, param in grid_search._all_params.items():
+        cross_val = cross_val_score(grid_search._set_params(param),
+                                    X_train,
+                                    y_train,
+                                    cv=kfold,
+                                    n_jobs=-1)
+        print(f"Cross validation score {np.mean(cross_val)} +/- {np.std(cross_val)}")
+
+        model = grid_search._set_params(param)
+        model.fit(X_train, y_train)
+        predictions = model.predict_proba(X_test)[:, 1]
+        print(y_test.shape, predictions.shape)
+        metrics = get_metrics(y_test, predictions, baseline=0.5)
+        params = {"name": name,
+                "Data type": datatype,
+                "Run_time": time.time() - start_time}
+        
+        mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
+        print(f"Accuracy: {metrics['Accuracy']} \n \
+                Precision: {metrics['Precision']} \n \
+                Recall: {metrics['Recall']} \n \
+                True Positives: {metrics['True_positives']} \n \
+                False Positives: {metrics['False_positives']} \n \
+                Total positives: {sum(y_test)} \n \
+                Total positive predicted values: {sum(np.where(predictions > 0.5, 1, 0))} \n \
+                Runtime: {params['Run_time']}s")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train", type=str, default=None, help="Train dataset to train the model")
     parser.add_argument("--test", type=str, default=None, help="Test dataset to evaluate the model")
+    parser.add_argument("--datatype", type=str, default="Descriptors", help="Type of data format (fingerprint, descriptor etc) to use to train the model")
     parser.add_argument("--mlflow_tracking_uri", type=str, default="http://localhost:8080", help="URI to dump mlflow tracking data")
     args = parser.parse_args()
 
     # setting mlflow parameters
     mlflow.set_tracking_uri(args.mlflow_tracking_uri)
     mlflow.set_experiment("Malaria project")
-    train_models(args.train, args.test)
+    train_models(args.train, args.test, args.datatype)
 
 if __name__ == "__main__":
     main()
