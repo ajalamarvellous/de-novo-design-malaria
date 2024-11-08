@@ -10,6 +10,7 @@ import numpy as np
 from itertools import product
 
 from pathlib import Path
+import logging
 from typing import TypeVar, List, Tuple, Union, NewType
 
 
@@ -23,6 +24,12 @@ from sklearn.metrics import (
     precision_recall_curve
 )
 
+# basic logging config
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s ",
+)
+logger = logging.getLogger()
 
 # defining new variable for our artifact locations
 addressType = TypeVar("addressType", str, Path)
@@ -51,6 +58,7 @@ def read_file(file_address: addressType, dtype="csv") -> pd.DataFrame:
         df = pd.read_csv(file_address, low_memory=False)
     else:
         df = pd.read_table(file_address, low_memory=False)
+    logger.info("file read successfully...")
     return df
 
 
@@ -72,6 +80,7 @@ def get_mols(df: pd.DataFrame, column: str="SMILES") -> List[molType]:
         list of the rdkit MOLs for the smiles supplied
     """
     mols = [Chem.MolFromSmiles(x) for x in df[column]]
+    logger.info("RDKit mols successfully retrieved...")
     return mols
 
 
@@ -108,6 +117,7 @@ def get_fingerprints(
         fingerprints = np.array([fingerprnt_gen.GetFingerprintAsNumPy(x) for x in mols])
     else:
         fingerprints = fingerprnt_gen.GetFingerprints(mols)
+    logger.info(f"Fingerprints successfully retrieved.... Type numpy: {as_numpy}")
     return fingerprints
     
 
@@ -156,6 +166,7 @@ def prepare_data(
     elif datatype == "Descriptors":
         X = get_descriptors(df, dataset, smiles_col)
     y = np.where(df[target_col].values == True, 1, 0)
+    logger.info("Returning representations now....")
     return (X, y)
 
 
@@ -197,6 +208,7 @@ def get_metrics(y_test: np.array, y_pred: np.array, baseline: float) -> dict:
         "fpr": fpr,
         "tpr": tpr,
     }
+    logger.info("Metrics successfully gotten...")
     return metrics
 
 
@@ -213,7 +225,7 @@ class GridSearch:
         self.best_estimator_ = None
 
     def fit(self, X, y):
-        print(f"Training {len(self._params_grid)} cobinations")
+        logger.info(f"Beginning GridSearch now...")
         for param in tqdm.tqdm(self._params_grid):
             if self._other_params != {}:
                 param.update(self._other_params)
@@ -232,6 +244,7 @@ class GridSearch:
         keys = list(params.keys())
         combinations = list(product(*params.values()))
         c = [dict((k,v) for k,v in zip(keys,values)) for values in combinations]
+        logger.info(f"{len(c)} combinations to search")
         return c
 
     def _set_params(self, params):
@@ -279,10 +292,12 @@ def get_descriptors(df: pd.DataFrame, dataset: str, column: str="SMILES") -> np.
     file_name = Path(__file__).parents[1]/ f"data/{dataset}.npy"
     if file_name.exists():
         descriptors = np.load(file_name)
+        logger.info("Saved descriptors found and loaded....")
     else:
         transformer = FPVecTransformer(kind="desc2D", dtype=float)
         descriptors = transformer(smi_list)
         descriptors = np.nan_to_num(descriptors)
         np.save(file_name, descriptors)
         os.system("clear")
+        logger.info("Descriptors successfully retrieved and saved...")
     return descriptors

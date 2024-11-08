@@ -1,5 +1,6 @@
 import time
 import argparse
+import logging
 
 import mlflow
 from pathlib import Path
@@ -24,6 +25,14 @@ from sklearn.svm import SVC
 from xgboost import XGBClassifier
 
 from models import NNClassifier
+
+# basic logging config
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s] [%(funcName)s] [%(levelname)s]: %(message)s ",
+)
+logger = logging.getLogger()
+
 
 def mlflow_logging(model, params: dict, metrics: dict) -> None:
     """
@@ -58,21 +67,23 @@ def mlflow_logging(model, params: dict, metrics: dict) -> None:
         mlflow.log_metrics(metrics)
         mlflow.log_figure(fig1, "precision_recall_graph.png")
         mlflow.log_figure(fig2, "ROC_Curve.png")
+    logger.info("All metrics logged to mlflow")
+
 
 def train_models(train_data: str, test_data: str, datatype: str, SEED: int=2024) -> None:
 
     scaler = StandardScaler()
-    print("Getting train data...")
-    X_train, y_train = prepare_data(train_data, datatype="Descriptors", dataset="train")
+    logger.info(f"Getting train data using {datatype} representation...")
+    X_train, y_train = prepare_data(train_data, datatype=datatype, dataset="train")
     class_weight = dict(
         zip([0,1], np.bincount(y_train)/ len(y_train))
     )
     X_train_scaled = scaler.fit_transform(X_train)
-    print("Trainset", X_train.shape, y_train.shape)
+    logger.info(f"Trainset shape: {X_train.shape, y_train.shape}")
 
-    print("Getting test data...")
-    X_test, y_test = prepare_data(test_data, datatype="Descriptors", dataset="test")
-    print("Testset", X_test.shape, y_test.shape)
+    logger.info("Getting test data...")
+    X_test, y_test = prepare_data(test_data, datatype=datatype, dataset="test")
+    logger.info(f"Testset shape {X_test.shape, y_test.shape}")
     X_test_scaled = scaler.transform(X_test)
 
     params_list = {
@@ -128,8 +139,7 @@ def train_models(train_data: str, test_data: str, datatype: str, SEED: int=2024)
   
     for model in models:
         name = str(model[0]).split(".")[-1].split("'")[0]
-        print(name)
-        print(f"Training {name} now...")
+        logger.info(f"Training {name} now...")
         start_time = time.time()
 
         if name == "LogisticRegression" or name == "MLPClassifier":
@@ -146,26 +156,26 @@ def train_loop(model, params_list, X_train, y_train, X_test, y_test, name, datat
     kfold = KFold(n_splits=n_folds)
     grid_search = GridSearch(model[0], params_list[name], "accuracy", other_params=model[1])
     grid_search.fit(X_train, y_train)
-    print(f"Best score: {grid_search.best_score_}, ")
+    logger.info(f"Best score: {grid_search.best_score_}, ")
     for _, param in grid_search._all_params.items():
         cross_val = cross_val_score(grid_search._set_params(param),
                                     X_train,
                                     y_train,
                                     cv=kfold,
                                     n_jobs=-1)
-        print(f"Cross validation score {np.mean(cross_val)} +/- {np.std(cross_val)}")
+        logger.info(f"Cross validation score {np.mean(cross_val)} +/- {np.std(cross_val)}")
 
         model = grid_search._set_params(param)
         model.fit(X_train, y_train)
         predictions = model.predict_proba(X_test)[:, 1]
-        print(y_test.shape, predictions.shape)
+        logger.debug(f"Shape of y_test: {y_test.shape}, shape of y_pred: {predictions.shape}")
         metrics = get_metrics(y_test, predictions, baseline=0.5)
         params = {"name": name,
                 "Data type": datatype,
                 "Run_time": time.time() - start_time}
         
         mlflow_logging(grid_search.best_estimator_, params=params, metrics=metrics)
-        print(f"Accuracy: {metrics['Accuracy']} \n \
+        logger.info(f"Accuracy: {metrics['Accuracy']} \n \
                 Precision: {metrics['Precision']} \n \
                 Recall: {metrics['Recall']} \n \
                 True Positives: {metrics['True_positives']} \n \
