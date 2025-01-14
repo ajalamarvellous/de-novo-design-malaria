@@ -3,3 +3,4 @@
 .DS_Store
 mlruns
 mlartifacts/
+/data/
